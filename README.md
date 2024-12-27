@@ -18,7 +18,7 @@ SeCached is a high-performance, secure, and minimalistic caching system inspired
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/seCached.git
+   git clone https://github.com/alirezacomputerengineer/seCached.git
    cd seCached
    ```
 2. Build the project:
