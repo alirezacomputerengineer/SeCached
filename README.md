@@ -71,7 +71,7 @@ get mykey
 | **Option**         | **Description**                              | **Example**                  | **Status** |
 |--------------------|----------------------------------------------|------------------------------|------------|
 | `-m <size>`       | Maximum memory usage (MB).                  | `-m 64`                     |            |
-| `-p <port>`       | Port number.                                | `-p 11211`                  |            |
+| `-p <port>`       | Port number.                                | `-p 11211`                  |      ✔     |
 | `-l <ip>`         | Listen on specific IP address.              | `-l 127.0.0.1`              |            |
 | `-c <connections>`| Max simultaneous connections.               | `-c 1024`                   |            |
 | `-d`              | Run as a daemon.                            | `-d`                        |            |
