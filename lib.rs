@@ -64,6 +64,7 @@ pub enum Command {
 #[derive(Debug)]
 pub struct Request {
     command: Command,
+    key: String,
     value: Vec<String>,
 }
 
