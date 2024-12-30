@@ -86,86 +86,122 @@ pub fn get_response(
 }
 
 pub fn handle_set(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let mut cache = cache.write().unwrap();
+    let value = req.value[0].clone();
+    cache.insert(req.key.clone(), DataType::String(value));
+    let response = "STORED\r\n".to_string();
+    response
+}
+
+pub fn  handle_add(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_replace(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_append(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_cas(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_get(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
-    response
+    let cache = cache.read().unwrap();
+    let request_value = cache.get(&req.key);
+    match request_value {
+        Some(value) => match value {
+            DataType::String(value) => {
+                let response = format!("VALUE {} 0 {}\r\n{}\r\nEND", req.key, value.len(), value);
+                return response;
+            }
+
+            _ => {
+                let response = WRONG_TYPE_ERROR_RESPONSE.clone().to_string();
+                return response;
+            }
+        },
+        None => {
+            let response = "END\r\n".to_string();
+            return response;
+        }
+    }
 }
 
 pub fn  handle_gets(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_delete(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
-    response
+    let mut cache = cache.write().unwrap();
+    let key_to_delete = cache.get(&req.key);
+    match key_to_delete {
+        Some(_) => {
+            cache.remove(&req.key);
+            let response = "DELETED\r\n".to_string();
+            response
+        }
+        None => {
+            let response = "NOT_FOUND\r\n".to_string();
+            response
+        }
+    }
 }
 
 pub fn  handle_incr(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_decr(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_stats(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_stat_items(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_stat_slabs(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_state_sizes(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_flush_all(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_version(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "0.0.1".to_string();
     response
 }
 
 pub fn  handle_verbosity(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
 
 pub fn  handle_quit(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string()
+    let response = "Not Implemented Yet !".to_string();
     response
 }
