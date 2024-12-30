@@ -91,5 +91,5 @@ get mykey
 Contributions are welcome! Please fork the repository and submit a pull request with your changes.
 
 ## License
-SeCached is licensed under the MIT License. See `LICENSE` for details.
+SeCached is licensed under the MIT License.
 
