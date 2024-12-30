@@ -43,4 +43,10 @@ pub fn parse_resp(s: &String) -> Request {
             value.push(splitted[i].into())
         }
     }
+    let req = Request {
+        command: command.expect("Expected a valid command"),
+        key,
+        value,
+    };
+    return req
 }
