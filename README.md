@@ -47,15 +47,15 @@ get mykey
 ### Commands Implementation
 | **Command**       | **Description**                               | **Example**                          | **Status** |
 |--------------------|-----------------------------------------------|---------------------------------------|------------|
-| `set`             | Store a value with a key.                    | `set mykey 0 900 5\r\nhello\r\n`   |            |
+| `set`             | Store a value with a key.                    | `set mykey 0 900 5\r\nhello\r\n`   |     ✔      |
 | `add`             | Store a value if the key doesn’t exist.     | `add mykey 0 900 5\r\nhello\r\n`   |            |
 | `replace`         | Replace the value of an existing key.        | `replace mykey 0 900 5\r\nworld\r\n` |            |
 | `append`          | Append data to an existing value.            | `append mykey 0 900 5\r\n there\r\n` |            |
 | `prepend`         | Prepend data to an existing value.           | `prepend mykey 0 900 5\r\nHi \r\n` |            |
 | `cas`             | Store a value if the CAS token matches.      | `cas mykey 0 900 5 42\r\nhello\r\n` |            |
-| `get`             | Retrieve a value by its key.                 | `get mykey\r\n`                    |            |
+| `get`             | Retrieve a value by its key.                 | `get mykey\r\n`                    |     ✔      |
 | `gets`            | Retrieve a value with its CAS token.         | `gets mykey\r\n`                   |            |
-| `delete`          | Delete a key and its value.                  | `delete mykey\r\n`                 |            |
+| `delete`          | Delete a key and its value.                  | `delete mykey\r\n`                 |     ✔      |
 | `incr`            | Increment a numeric value.                   | `incr mycounter 5\r\n`             |            |
 | `decr`            | Decrement a numeric value.                   | `decr mycounter 3\r\n`             |            |
 | `stats`           | Get server statistics.                       | `stats\r\n`                        |            |
