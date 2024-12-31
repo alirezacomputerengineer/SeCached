@@ -65,7 +65,7 @@ get mykey
 | `flush_all`       | Clear all data from the cache.               | `flush_all\r\n`                    |            |
 | `version`         | Get the server version.                      | `version\r\n`                      |     ✔      |
 | `verbosity`       | Set the verbosity level.                     | `verbosity 2\r\n`                  |            |
-| `quit`            | Close the connection.                        | `quit\r\n`                         |            |
+| `quit`            | Close the connection.                        | `quit\r\n`                         |     ✔      |
 
 ### Runtime Options Implementation
 | **Option**         | **Description**                              | **Example**                  | **Status** |
