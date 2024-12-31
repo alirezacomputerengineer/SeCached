@@ -40,7 +40,7 @@ impl SeCached {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Command {
     SET,
     ADD,
