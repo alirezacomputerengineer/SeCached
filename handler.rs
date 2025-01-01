@@ -7,11 +7,11 @@ use std::{
     time::Duration,
 };
 
-use crate::{parser::parse_resp, Command, DataType, Request};
+use crate::{parser::parse_req, Command, DataType, Request};
 static WRONG_TYPE_ERROR_RESPONSE: &str =
     "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n";
 
-pub fn process_request(
+    pub fn process_request(
     mut stream: TcpStream,
     cache: Arc<RwLock<HashMap<String, DataType>>>,
     bus: Arc<RwLock<HashMap<String, Vec<TcpStream>>>>,
@@ -23,48 +23,41 @@ pub fn process_request(
         if let Some(timeout) = timeout {
             stream.set_read_timeout(Some(timeout)).unwrap();
         }
+
         let mut buf_reader = BufReader::new(&mut stream);
         let mut first_line = String::new();
-        let res = buf_reader.read_line(&mut first_line);
-        match res {
+        match buf_reader.read_line(&mut first_line) {
             Err(_) => {
                 stream.flush().unwrap();
                 stream.shutdown(std::net::Shutdown::Read).unwrap();
                 return;
             }
-            Ok(s) => {
-                if s == 0 {
+            Ok(bytes_read) => {
+                if bytes_read == 0 {
                     stream.flush().unwrap();
                     stream.shutdown(std::net::Shutdown::Both).unwrap();
                     return;
                 }
-                let size = first_line[1..first_line.len() - 2]
-                    .parse::<usize>()
-                    .unwrap();
-                let mut resp = vec![first_line];
-                for _ in 1..=size * 2 {
-                    let mut line = String::new();
-                    buf_reader.read_line(&mut line).unwrap();
-                    resp.push(line);
-                }
-                let resp = resp.join("");
-                let req = parse_resp(&resp);
-                // If the command is QUIT, handle it by closing the connection
+                println!("{}",first_line);
+                let req = parse_req(&first_line); 
+                
+                // Handle QUIT command
                 if req.command == Command::QUIT {
                     let response = "QUIT\r\n".to_string();
                     stream.write_all(response.as_bytes()).unwrap();
-                    // Close the connection and exit the loop
                     stream.flush().unwrap();
                     stream.shutdown(std::net::Shutdown::Both).unwrap();
                     return;
                 }
-                let cache = cache;
+
+                // Process the request and get a response
                 let response = get_response(cache, bus, &req, &mut stream);
                 stream.write_all(response.as_bytes()).unwrap();
             }
         }
     }
 }
+
 
 pub fn get_response(
     cache: Arc<RwLock<HashMap<String, DataType>>>,
