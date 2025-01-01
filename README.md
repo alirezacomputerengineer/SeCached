@@ -37,8 +37,7 @@ telnet 127.0.0.1 11211
 ```
 ### Example:
 ```bash
-set mykey 0 900 5
-hello
+set mykey 0 900 5 hello
 
 get mykey
 ```
