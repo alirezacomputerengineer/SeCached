@@ -11,7 +11,7 @@ use crate::{parser::parse_req, Command, DataType, Request};
 static WRONG_TYPE_ERROR_RESPONSE: &str =
     "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n";
 
-    pub fn process_request(
+pub fn process_request(
     mut stream: TcpStream,
     cache: Arc<RwLock<HashMap<String, DataType>>>,
     bus: Arc<RwLock<HashMap<String, Vec<TcpStream>>>>,
@@ -40,18 +40,16 @@ static WRONG_TYPE_ERROR_RESPONSE: &str =
                 }
                 let req = parse_req(&first_line); 
                 
-                // Handle QUIT command
+                // Process the request and get a response
+                let response = get_response(cache, bus, &req, &mut stream);
+                stream.write_all(response.as_bytes()).unwrap();
+                
+                // Handle QUIT command to close connection
                 if req.command == Command::QUIT {
-                    let response = "QUIT\r\n".to_string();
-                    stream.write_all(response.as_bytes()).unwrap();
                     stream.flush().unwrap();
                     stream.shutdown(std::net::Shutdown::Both).unwrap();
                     return;
                 }
-
-                // Process the request and get a response
-                let response = get_response(cache, bus, &req, &mut stream);
-                stream.write_all(response.as_bytes()).unwrap();
             }
         }
     }
@@ -82,7 +80,7 @@ pub fn get_response(
         Command::FLUSH_ALL => handle_flush_all(req, cache),
         Command::VERSION => handle_version(req, cache),
         Command::VERBOSITY => handle_verbosity(req, cache),
-        Command::QUIT => handle_quit(req, cache, stream),
+        Command::QUIT => handle_quit(),
     }
 }
 
@@ -202,18 +200,6 @@ pub fn  handle_verbosity(req: &Request, cache: Arc<RwLock<HashMap<String, DataTy
     response
 }
 
-pub fn handle_quit(
-    req: &Request,
-    cache: Arc<RwLock<HashMap<String, DataType>>>,
-    stream: &mut TcpStream,
-) -> String {
-    // Log the quit action if necessary
-    println!("Client requested to quit. Closing connection.");
-    
-    // Flush and close the stream
-    let _ = stream.flush();
-    let _ = stream.shutdown(std::net::Shutdown::Both);
-    
-    // Return a success response
+pub fn handle_quit() -> String {
     "QUIT\r\n".to_string()
 }
