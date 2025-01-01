@@ -191,7 +191,7 @@ pub fn  handle_flush_all(req: &Request, cache: Arc<RwLock<HashMap<String, DataTy
 }
 
 pub fn  handle_version(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "0.0.1".to_string();
+    let response = "0.0.1\r\n".to_string();
     response
 }
 
