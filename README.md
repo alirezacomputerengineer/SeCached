@@ -27,7 +27,7 @@ SeCached is a high-performance, secure, and minimalistic caching system inspired
    ```
 3. Run the server:
    ```bash
-   ./target/release/seCached -m 64 -p 11211
+   ./target/release/seCached -p 11211
    ```
 
 ### Usage
