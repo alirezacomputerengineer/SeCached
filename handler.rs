@@ -38,7 +38,6 @@ static WRONG_TYPE_ERROR_RESPONSE: &str =
                     stream.shutdown(std::net::Shutdown::Both).unwrap();
                     return;
                 }
-                println!("{}",first_line);
                 let req = parse_req(&first_line); 
                 
                 // Handle QUIT command
