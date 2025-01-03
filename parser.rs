@@ -36,21 +36,21 @@ pub fn parse_req(s: &String) -> Request {
         "VERSION" => command = Some(Command::VERSION),
         "VERBOSITY" => command = Some(Command::VERBOSITY),
         "QUIT" => command = Some(Command::QUIT),
-        other => {
-            panic!("ERROR");
-        }
+        _ => command = Some(Command::ERROR),
     };
 
     key = if parts.len() > 1 { parts[1].to_string() } else { "".to_string() };
-    value = parts[1..]
+    if parts.len() > 2 {
+    value = parts[2..]
         .iter()
         .map(|part| part.to_string())
         .collect::<Vec<String>>();
-
-        let req = Request {
-            command: command.expect("Expected a valid command"),
-            key,
-            value,
-        };
+    }
+    let req = Request {
+        command: command.expect("Expected a valid command"),
+        key,
+        value,
+    };
     return req
 }
+
