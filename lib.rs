@@ -60,7 +60,6 @@ pub enum Command {
     STATS_SIZES,
     FLUSH_ALL,
     VERSION,
-    VERBOSITY,
     QUIT,
     ERROR, 
 }
