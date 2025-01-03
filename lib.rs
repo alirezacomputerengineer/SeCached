@@ -4,6 +4,7 @@ use std::{
     sync::{Arc, RwLock},
     thread,
     time::Duration,
+    time::SystemTime,
 };
 mod handler;
 mod parser;
@@ -60,6 +61,7 @@ pub enum Command {
     VERSION,
     VERBOSITY,
     QUIT,
+    ERROR, 
 }
 #[derive(Debug)]
 pub struct Request {
@@ -68,11 +70,20 @@ pub struct Request {
     value: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DataType {
     String(String),
     List(Vec<String>),
-    // Set,
-    // Hash,
-    // SortedSet,
+    Set(Vec<String>),
+    Hash(std::collections::HashMap<String, String>),
+    SortedSet(Vec<(String, i32)>), // Example: tuples of (key, score)
+}
+
+#[derive(Debug, Clone)]
+pub struct CacheItem {
+    pub data_type: DataType, // The type of data (String, List, etc.)
+    pub flags: u32,          // Metadata about the data
+    pub expiration: u64,     // Expiration time as a UNIX timestamp (0 means never expires)
+    pub size: usize,         // Size of the data in bytes
+    pub created_at: SystemTime, // Timestamp of when the item was created
 }
