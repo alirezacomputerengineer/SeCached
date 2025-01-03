@@ -47,6 +47,7 @@ pub enum Command {
     ADD,
     REPLACE,
     APPEND,
+    PREPEND,
     CAS,
     GET,
     GETS,
