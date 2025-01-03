@@ -5,15 +5,16 @@ use std::{
     sync::{Arc, RwLock},
     thread,
     time::Duration,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::{parser::parse_req, Command, DataType, Request};
+use crate::{parser::parse_req, Command, DataType, Request, CacheItem};
 static WRONG_TYPE_ERROR_RESPONSE: &str =
     "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n";
 
 pub fn process_request(
     mut stream: TcpStream,
-    cache: Arc<RwLock<HashMap<String, DataType>>>,
+    cache: Arc<RwLock<HashMap<String, CacheItem>>>,
     bus: Arc<RwLock<HashMap<String, Vec<TcpStream>>>>,
     timeout: Option<Duration>,
 ) {
@@ -57,7 +58,7 @@ pub fn process_request(
 
 
 pub fn get_response(
-    cache: Arc<RwLock<HashMap<String, DataType>>>,
+    cache: Arc<RwLock<HashMap<String, CacheItem>>>,
     bus: Arc<RwLock<HashMap<String, Vec<TcpStream>>>>,
     req: &Request,
     stream: &mut TcpStream,
@@ -78,128 +79,163 @@ pub fn get_response(
         Command::STATS_SLABS => handle_stat_slabs(req, cache),
         Command::STATS_SIZES => handle_state_sizes(req, cache),
         Command::FLUSH_ALL => handle_flush_all(req, cache),
-        Command::VERSION => handle_version(req, cache),
+        Command::VERSION => handle_version(),
         Command::VERBOSITY => handle_verbosity(req, cache),
         Command::QUIT => handle_quit(),
+        Command::ERROR => handle_error(),
     }
 }
 
-pub fn handle_set(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let mut cache = cache.write().unwrap();
-    let value = req.value[0].clone();
-    cache.insert(req.key.clone(), DataType::String(value));
-    let response = "STORED\r\n".to_string();
-    response
-}
-
-pub fn  handle_add(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
-}
-
-pub fn  handle_replace(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
-}
-
-pub fn  handle_append(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
-}
-
-pub fn  handle_cas(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
-}
-
-pub fn  handle_get(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let cache = cache.read().unwrap();
-    let request_value = cache.get(&req.key);
-    match request_value {
-        Some(value) => match value {
-            DataType::String(value) => {
-                let response = format!("VALUE {} 0 {}\r\n{}\r\nEND", req.key, value.len(), value);
-                return response;
-            }
-
-            _ => {
-                let response = WRONG_TYPE_ERROR_RESPONSE.clone().to_string();
-                return response;
-            }
-        },
-        None => {
-            let response = "END\r\n".to_string();
-            return response;
-        }
+pub fn handle_set(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    // Ensure the request has exactly 4 parts: flags, exptime, bytes, and data
+    if req.value.len() != 4 {
+        return "CLIENT_ERROR bad command line format\r\n".to_string();
     }
-}
 
-pub fn  handle_gets(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
-}
+    // Parse the request fields
+    let flags: u32 = req.value[0].parse().unwrap_or(0); // Default to 0 if parsing fails
+    let exptime: u64 = req.value[1].parse().unwrap_or(0); // Default to 0 if parsing fails
+    let bytes: usize = req.value[2].parse().unwrap_or(0); // Default to 0 if parsing fails
+    let data = req.value[3].clone();
 
-pub fn  handle_delete(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
+    // Check if the provided data matches the specified size
+    if data.len() != bytes {
+        return "CLIENT_ERROR bad data chunk\r\n".to_string();
+    }
+
+    // Create a new CacheItem
+    let expiration = if exptime == 0 {
+        0 // Never expires
+    } else {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        now + exptime
+    };
+
+    let cache_item = CacheItem {
+        data_type: DataType::String(data.clone()), // Storing as a String type
+        flags,
+        expiration,
+        size: bytes,
+        created_at: SystemTime::now(),
+    };
+
+    // Insert into the cache
     let mut cache = cache.write().unwrap();
-    let key_to_delete = cache.get(&req.key);
-    match key_to_delete {
-        Some(_) => {
+    cache.insert(req.key.clone(), cache_item);
+
+    // Return response
+    "STORED\r\n".to_string()
+}
+
+pub fn  handle_add(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
+}
+
+pub fn  handle_replace(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
+}
+
+pub fn  handle_append(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
+}
+
+pub fn  handle_cas(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
+}
+
+pub fn handle_get(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    let mut cache = cache.write().unwrap();
+
+    // Check if the key exists in the cache
+    if let Some(item) = cache.get(&req.key) {
+        // Check if the item has expired
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        if item.expiration != 0 && now > item.expiration {
+            // Remove expired item
             cache.remove(&req.key);
-            let response = "DELETED\r\n".to_string();
-            response
+            return "END\r\n".to_string();
         }
-        None => {
-            let response = "NOT_FOUND\r\n".to_string();
-            response
+
+        // Handle different data types
+        match &item.data_type {
+            DataType::String(value) => {
+                let response = format!(
+                    "VALUE {} {} {}\r\n{}\r\nEND\r\n",
+                    req.key, item.flags, value.len(), value
+                );
+                return response;
+            }
+            _ => {
+                // Return error for unsupported data type
+                return "CLIENT_ERROR wrong type\r\n".to_string();
+            }
         }
+    }
+
+    // Key not found
+    "END\r\n".to_string()
+}
+
+pub fn  handle_gets(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
+}
+
+pub fn handle_delete(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    let mut cache = cache.write().unwrap();
+
+    if cache.remove(&req.key).is_some() {
+        "DELETED\r\n".to_string()
+    } else {
+        "NOT_FOUND\r\n".to_string()
     }
 }
 
-pub fn  handle_incr(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
+pub fn  handle_incr(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
 }
 
-pub fn  handle_decr(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
+pub fn  handle_decr(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
 }
 
-pub fn  handle_stats(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
+pub fn  handle_stats(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
 }
 
-pub fn  handle_stat_items(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
+pub fn  handle_stat_items(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
 }
 
-pub fn  handle_stat_slabs(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
+pub fn  handle_stat_slabs(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
 }
 
-pub fn  handle_state_sizes(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
+pub fn  handle_state_sizes(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
 }
 
-pub fn  handle_flush_all(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
+pub fn  handle_flush_all(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
 }
 
-pub fn  handle_version(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "0.0.1\r\n".to_string();
-    response
+pub fn  handle_version() -> String {
+    "0.0.1\r\n".to_string()
 }
 
-pub fn  handle_verbosity(req: &Request, cache: Arc<RwLock<HashMap<String, DataType>>>) -> String {
-    let response = "Not Implemented Yet !".to_string();
-    response
+pub fn  handle_verbosity(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    "Not Implemented Yet !\r\n".to_string()
 }
 
 pub fn handle_quit() -> String {
     "QUIT\r\n".to_string()
+}
+
+pub fn handle_error() -> String {
+    "ERROR\r\n".to_string()
 }
