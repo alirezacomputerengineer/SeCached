@@ -22,6 +22,7 @@ pub fn parse_req(s: &String) -> Request {
         "ADD" => command = Some(Command::ADD),
         "REPLACE" => command = Some(Command::REPLACE),
         "APPEND" => command = Some(Command::APPEND),
+        "PREPEND" => command = Some(Command::PREPEND),
         "CAS" => command = Some(Command::CAS),
         "GET" => command = Some(Command::GET),
         "GETS" => command = Some(Command::GETS),
