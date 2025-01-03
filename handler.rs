@@ -81,7 +81,6 @@ pub fn get_response(
         Command::STATS_SIZES => handle_state_sizes(req, cache),
         Command::FLUSH_ALL => handle_flush_all(req, cache),
         Command::VERSION => handle_version(),
-        Command::VERBOSITY => handle_verbosity(req, cache),
         Command::QUIT => handle_quit(),
         Command::ERROR => handle_error(),
     }
@@ -360,12 +359,68 @@ pub fn handle_delete(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>
     }
 }
 
-pub fn  handle_incr(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
-    "Not Implemented Yet !\r\n".to_string()
+pub fn handle_incr(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    // Ensure the request has exactly 2 parts: key and increment value
+    if req.value.len() != 1 {
+        return "CLIENT_ERROR bad command line format\r\n".to_string();
+    }
+
+    // Parse the increment value
+    let incr_value: u64 = req.value[0].parse().unwrap_or(0); // Default to 0 if parsing fails
+
+    // Lock the cache for writing
+    let mut cache = cache.write().unwrap();
+
+    // Find the key in the cache
+    if let Some(existing_item) = cache.get_mut(&req.key) {
+        if let DataType::String(existing_data) = &mut existing_item.data_type {
+            if let Ok(current_value) = existing_data.parse::<u64>() {
+                // Increment the value
+                let new_value = current_value + incr_value;
+                *existing_data = new_value.to_string();
+
+                return format!("{}\r\n", new_value);
+            } else {
+                return "CLIENT_ERROR cannot increment non-numeric value\r\n".to_string();
+            }
+        } else {
+            return "CLIENT_ERROR incompatible data type\r\n".to_string();
+        }
+    } else {
+        return "NOT_FOUND\r\n".to_string();
+    }
 }
 
-pub fn  handle_decr(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
-    "Not Implemented Yet !\r\n".to_string()
+pub fn handle_decr(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    // Ensure the request has exactly 2 parts: key and decrement value
+    if req.value.len() != 1 {
+        return "CLIENT_ERROR bad command line format\r\n".to_string();
+    }
+
+    // Parse the decrement value
+    let decr_value: u64 = req.value[0].parse().unwrap_or(0); // Default to 0 if parsing fails
+
+    // Lock the cache for writing
+    let mut cache = cache.write().unwrap();
+
+    // Find the key in the cache
+    if let Some(existing_item) = cache.get_mut(&req.key) {
+        if let DataType::String(existing_data) = &mut existing_item.data_type {
+            if let Ok(current_value) = existing_data.parse::<u64>() {
+                // Decrement the value, ensuring it does not go below 0
+                let new_value = current_value.saturating_sub(decr_value);
+                *existing_data = new_value.to_string();
+
+                return format!("{}\r\n", new_value);
+            } else {
+                return "CLIENT_ERROR cannot decrement non-numeric value\r\n".to_string();
+            }
+        } else {
+            return "CLIENT_ERROR incompatible data type\r\n".to_string();
+        }
+    } else {
+        return "NOT_FOUND\r\n".to_string();
+    }
 }
 
 pub fn  handle_stats(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
@@ -384,16 +439,34 @@ pub fn  handle_state_sizes(req: &Request, cache: Arc<RwLock<HashMap<String, Cach
     "Not Implemented Yet !\r\n".to_string()
 }
 
-pub fn  handle_flush_all(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
-    "Not Implemented Yet !\r\n".to_string()
+pub fn handle_flush_all(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
+    // Parse optional delay from the request
+    let delay = if !req.value.is_empty() {
+        req.value[0].parse::<u64>().unwrap_or(0) // Default to 0 if parsing fails
+    } else {
+        0
+    };
+
+    if delay == 0 {
+        // Immediate flush: Clear the cache
+        let mut cache = cache.write().unwrap();
+        cache.clear();
+    } else {
+        // Delayed flush: Schedule the cache clearing
+        let cache_clone = Arc::clone(&cache);
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(delay));
+            let mut cache = cache_clone.write().unwrap();
+            cache.clear();
+        });
+    }
+
+    // Return response
+    "OK\r\n".to_string()
 }
 
 pub fn  handle_version() -> String {
     "0.0.1\r\n".to_string()
-}
-
-pub fn  handle_verbosity(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
-    "Not Implemented Yet !\r\n".to_string()
 }
 
 pub fn handle_quit() -> String {
