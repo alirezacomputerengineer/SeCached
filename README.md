@@ -55,15 +55,14 @@ get mykey
 | `get`             | Retrieve a value by its key.                 | `get mykey\r\n`                    |     ✔      |
 | `gets`            | Retrieve a value with its CAS token.         | `gets mykey\r\n`                   |            |
 | `delete`          | Delete a key and its value.                  | `delete mykey\r\n`                 |     ✔      |
-| `incr`            | Increment a numeric value.                   | `incr mycounter 5\r\n`             |            |
-| `decr`            | Decrement a numeric value.                   | `decr mycounter 3\r\n`             |            |
+| `incr`            | Increment a numeric value.                   | `incr mycounter 5\r\n`             |     ✔      |
+| `decr`            | Decrement a numeric value.                   | `decr mycounter 3\r\n`             |     ✔      |
 | `stats`           | Get server statistics.                       | `stats\r\n`                        |            |
 | `stats items`     | Get statistics about item storage.           | `stats items\r\n`                  |            |
 | `stats slabs`     | Get statistics about slab allocation.        | `stats slabs\r\n`                  |            |
 | `stats sizes`     | Get statistics about item sizes.             | `stats sizes\r\n`                  |            |
-| `flush_all`       | Clear all data from the cache.               | `flush_all\r\n`                    |            |
+| `flush_all`       | Clear all data from the cache.               | `flush_all\r\n`                    |     ✔      |
 | `version`         | Get the server version.                      | `version\r\n`                      |     ✔      |
-| `verbosity`       | Set the verbosity level.                     | `verbosity 2\r\n`                  |            |
 | `quit`            | Close the connection.                        | `quit\r\n`                         |     ✔      |
 
 ### Runtime Options Implementation
