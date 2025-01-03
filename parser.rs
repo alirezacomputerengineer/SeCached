@@ -35,7 +35,6 @@ pub fn parse_req(s: &String) -> Request {
         "STATS SIZES" => command = Some(Command::STATS_SIZES),
         "FLUSH_ALL" => command = Some(Command::FLUSH_ALL),
         "VERSION" => command = Some(Command::VERSION),
-        "VERBOSITY" => command = Some(Command::VERBOSITY),
         "QUIT" => command = Some(Command::QUIT),
         _ => command = Some(Command::ERROR),
     };
