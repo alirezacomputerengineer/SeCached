@@ -16,6 +16,7 @@ pub fn process_request(
     mut stream: TcpStream,
     cache: Arc<RwLock<HashMap<String, CacheItem>>>,
     bus: Arc<RwLock<HashMap<String, Vec<TcpStream>>>>,
+    mem: usize,
 ) {
     loop {
         let cache = cache.clone();
@@ -38,7 +39,7 @@ pub fn process_request(
                 let req = parse_req(&first_line); 
                 
                 // Process the request and get a response
-                let response = get_response(cache, bus, &req, &mut stream);
+                let response = get_response(cache, bus, &req, &mut stream, mem);
                 stream.write_all(response.as_bytes()).unwrap();
                 
                 // Handle QUIT command to close connection
@@ -58,13 +59,14 @@ pub fn get_response(
     bus: Arc<RwLock<HashMap<String, Vec<TcpStream>>>>,
     req: &Request,
     stream: &mut TcpStream,
+    mem: usize,
 ) -> String {
     match req.command {
-        Command::SET => handle_set(req, cache),
-        Command::ADD => handle_add(req, cache),
-        Command::REPLACE => handle_replace(req, cache),
-        Command::APPEND => handle_append(req, cache),
-        Command::PREPEND => handle_prepend(req, cache),
+        Command::SET => handle_set(req, cache, mem),
+        Command::ADD => handle_add(req, cache, mem),
+        Command::REPLACE => handle_replace(req, cache, mem),
+        Command::APPEND => handle_append(req, cache, mem),
+        Command::PREPEND => handle_prepend(req, cache, mem),
         Command::CAS => handle_cas(req, cache),
         Command::GET => handle_get(req, cache),
         Command::GETS => handle_gets(req, cache),
@@ -82,26 +84,22 @@ pub fn get_response(
     }
 }
 
-pub fn handle_set(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
-    // Ensure the request has exactly 4 parts: flags, exptime, bytes, and data
+pub fn handle_set(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>, mem: usize) -> String {
     if req.value.len() != 4 {
         return "CLIENT_ERROR bad command line format\r\n".to_string();
     }
 
-    // Parse the request fields
-    let flags: u32 = req.value[0].parse().unwrap_or(0); // Default to 0 if parsing fails
-    let exptime: u64 = req.value[1].parse().unwrap_or(0); // Default to 0 if parsing fails
-    let bytes: usize = req.value[2].parse().unwrap_or(0); // Default to 0 if parsing fails
+    let flags: u32 = req.value[0].parse().unwrap_or(0);
+    let exptime: u64 = req.value[1].parse().unwrap_or(0);
+    let bytes: usize = req.value[2].parse().unwrap_or(0);
     let data = req.value[3].clone();
 
-    // Check if the provided data matches the specified size
     if data.len() != bytes {
         return "CLIENT_ERROR bad data chunk\r\n".to_string();
     }
 
-    // Create a new CacheItem
     let expiration = if exptime == 0 {
-        0 // Never expires
+        0
     } else {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -111,49 +109,45 @@ pub fn handle_set(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>)
     };
 
     let cache_item = CacheItem {
-        data_type: DataType::String(data.clone()), // Storing as a String type
+        data_type: DataType::String(data.clone()),
         flags,
         expiration,
         size: bytes,
         created_at: SystemTime::now(),
     };
 
-    // Insert into the cache
     let mut cache = cache.write().unwrap();
-    cache.insert(req.key.clone(), cache_item);
 
-    // Return response
+    if !ensure_memory(&mut cache, mem, bytes) {
+        return "SERVER_ERROR not enough memory\r\n".to_string();
+    }
+
+    cache.insert(req.key.clone(), cache_item);
     "STORED\r\n".to_string()
 }
 
-pub fn handle_add(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
-    // Ensure the request has exactly 4 parts: flags, exptime, bytes, and data
+pub fn handle_add(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>, mem: usize) -> String {
     if req.value.len() != 4 {
         return "CLIENT_ERROR bad command line format\r\n".to_string();
     }
 
-    // Parse the request fields
-    let flags: u32 = req.value[0].parse().unwrap_or(0); // Default to 0 if parsing fails
-    let exptime: u64 = req.value[1].parse().unwrap_or(0); // Default to 0 if parsing fails
-    let bytes: usize = req.value[2].parse().unwrap_or(0); // Default to 0 if parsing fails
+    let flags: u32 = req.value[0].parse().unwrap_or(0);
+    let exptime: u64 = req.value[1].parse().unwrap_or(0);
+    let bytes: usize = req.value[2].parse().unwrap_or(0);
     let data = req.value[3].clone();
 
-    // Check if the provided data matches the specified size
     if data.len() != bytes {
         return "CLIENT_ERROR bad data chunk\r\n".to_string();
     }
 
-    // Lock the cache for writing
     let mut cache = cache.write().unwrap();
 
-    // Check if the key already exists
     if cache.contains_key(&req.key) {
         return "NOT_STORED\r\n".to_string();
     }
 
-    // Calculate the expiration time
     let expiration = if exptime == 0 {
-        0 // Never expires
+        0
     } else {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -162,7 +156,6 @@ pub fn handle_add(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>)
         now + exptime
     };
 
-    // Create a new CacheItem
     let cache_item = CacheItem {
         data_type: DataType::String(data.clone()),
         flags,
@@ -171,41 +164,36 @@ pub fn handle_add(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>)
         created_at: SystemTime::now(),
     };
 
-    // Insert into the cache
-    cache.insert(req.key.clone(), cache_item);
+    if !ensure_memory(&mut cache, mem, bytes) {
+        return "SERVER_ERROR not enough memory\r\n".to_string();
+    }
 
-    // Return response
+    cache.insert(req.key.clone(), cache_item);
     "STORED\r\n".to_string()
 }
 
-pub fn handle_replace(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
-    // Ensure the request has exactly 4 parts: flags, exptime, bytes, and data
+pub fn handle_replace(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>, mem: usize) -> String {
     if req.value.len() != 4 {
         return "CLIENT_ERROR bad command line format\r\n".to_string();
     }
 
-    // Parse the request fields
-    let flags: u32 = req.value[0].parse().unwrap_or(0); // Default to 0 if parsing fails
-    let exptime: u64 = req.value[1].parse().unwrap_or(0); // Default to 0 if parsing fails
-    let bytes: usize = req.value[2].parse().unwrap_or(0); // Default to 0 if parsing fails
+    let flags: u32 = req.value[0].parse().unwrap_or(0);
+    let exptime: u64 = req.value[1].parse().unwrap_or(0);
+    let bytes: usize = req.value[2].parse().unwrap_or(0);
     let data = req.value[3].clone();
 
-    // Check if the provided data matches the specified size
     if data.len() != bytes {
         return "CLIENT_ERROR bad data chunk\r\n".to_string();
     }
 
-    // Lock the cache for writing
     let mut cache = cache.write().unwrap();
 
-    // Check if the key exists
     if !cache.contains_key(&req.key) {
         return "NOT_STORED\r\n".to_string();
     }
 
-    // Calculate the expiration time
     let expiration = if exptime == 0 {
-        0 // Never expires
+        0
     } else {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -214,7 +202,6 @@ pub fn handle_replace(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem
         now + exptime
     };
 
-    // Create a new CacheItem
     let cache_item = CacheItem {
         data_type: DataType::String(data.clone()),
         flags,
@@ -223,83 +210,107 @@ pub fn handle_replace(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem
         created_at: SystemTime::now(),
     };
 
-    // Replace the existing key with the new value
-    cache.insert(req.key.clone(), cache_item);
+    if !ensure_memory(&mut cache, mem, bytes) {
+        return "SERVER_ERROR not enough memory\r\n".to_string();
+    }
 
-    // Return response
+    cache.insert(req.key.clone(), cache_item);
     "STORED\r\n".to_string()
 }
 
-pub fn handle_append(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
-    // Ensure the request has exactly 4 parts: flags, exptime, bytes, and data
+pub fn handle_append(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>, mem: usize) -> String {
     if req.value.len() != 4 {
         return "CLIENT_ERROR bad command line format\r\n".to_string();
     }
 
-    // Parse the request fields
-    let bytes: usize = req.value[2].parse().unwrap_or(0); // Default to 0 if parsing fails
+    let bytes: usize = req.value[2].parse().unwrap_or(0);
     let data = req.value[3].clone();
 
-    // Check if the provided data matches the specified size
     if data.len() != bytes {
         return "CLIENT_ERROR bad data chunk\r\n".to_string();
     }
 
-    // Lock the cache for writing
     let mut cache = cache.write().unwrap();
 
-    // Find the key in the cache
     if let Some(existing_item) = cache.get_mut(&req.key) {
+        // Temporarily extract the data type to avoid simultaneous mutable borrows
         if let DataType::String(existing_data) = &mut existing_item.data_type {
-            // Append the data to the existing value
-            existing_data.push_str(&data);
-            existing_item.size += bytes;
-
-            return "STORED\r\n".to_string();
+            let new_size = existing_data.len() + bytes;
+            let size_diff = new_size - existing_item.size;
+    
+            // Drop the mutable borrow of existing_item before calling ensure_memory
+            drop(existing_item);
+    
+            // Perform the memory check
+            if !ensure_memory(&mut *cache, mem, size_diff) {
+                return "SERVER_ERROR not enough memory\r\n".to_string();
+            }
+    
+            // Re-borrow the cache to update the item
+            if let Some(existing_item) = cache.get_mut(&req.key) {
+                if let DataType::String(existing_data) = &mut existing_item.data_type {
+                    existing_data.push_str(&data); // For append
+                    existing_item.size = new_size;
+                    return "STORED\r\n".to_string();
+                }
+            }
+    
+            // This should not happen, but handle it gracefully
+            return "SERVER_ERROR internal error\r\n".to_string();
         } else {
             return "CLIENT_ERROR incompatible data type\r\n".to_string();
         }
     } else {
         return "NOT_STORED\r\n".to_string();
-    }
+    }        
 }
 
-pub fn handle_prepend(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
-    // Ensure the request has exactly 4 parts: flags, exptime, bytes, and data
+pub fn handle_prepend(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>, mem: usize) -> String {
     if req.value.len() != 4 {
         return "CLIENT_ERROR bad command line format\r\n".to_string();
     }
 
-    // Parse the request fields
-    let bytes: usize = req.value[2].parse().unwrap_or(0); // Default to 0 if parsing fails
+    let bytes: usize = req.value[2].parse().unwrap_or(0);
     let data = req.value[3].clone();
 
-    // Check if the provided data matches the specified size
     if data.len() != bytes {
         return "CLIENT_ERROR bad data chunk\r\n".to_string();
     }
 
-    // Lock the cache for writing
     let mut cache = cache.write().unwrap();
 
-    // Find the key in the cache
     if let Some(existing_item) = cache.get_mut(&req.key) {
+        // Temporarily extract the data type to avoid simultaneous mutable borrows
         if let DataType::String(existing_data) = &mut existing_item.data_type {
-            // Prepend the data to the existing value
-            let mut new_data = data.clone();
-            new_data.push_str(existing_data);
-            *existing_data = new_data;
-            existing_item.size += bytes;
-
-            return "STORED\r\n".to_string();
+            let new_size = existing_data.len() + bytes;
+            let size_diff = new_size - existing_item.size;
+    
+            // Drop the mutable borrow of existing_item before calling ensure_memory
+            drop(existing_item);
+    
+            // Perform the memory check
+            if !ensure_memory(&mut *cache, mem, size_diff) {
+                return "SERVER_ERROR not enough memory\r\n".to_string();
+            }
+    
+            // Re-borrow the cache to update the item
+            if let Some(existing_item) = cache.get_mut(&req.key) {
+                if let DataType::String(existing_data) = &mut existing_item.data_type {
+                    existing_data.push_str(&data); // For append
+                    existing_item.size = new_size;
+                    return "STORED\r\n".to_string();
+                }
+            }
+    
+            // This should not happen, but handle it gracefully
+            return "SERVER_ERROR internal error\r\n".to_string();
         } else {
             return "CLIENT_ERROR incompatible data type\r\n".to_string();
         }
     } else {
         return "NOT_STORED\r\n".to_string();
-    }
+    }        
 }
-
 
 pub fn  handle_cas(req: &Request, cache: Arc<RwLock<HashMap<String, CacheItem>>>) -> String {
     "Not Implemented Yet !\r\n".to_string()
@@ -471,4 +482,22 @@ pub fn handle_quit() -> String {
 
 pub fn handle_error() -> String {
     "ERROR\r\n".to_string()
+}
+
+fn ensure_memory(cache: &mut HashMap<String, CacheItem>, mem_limit: usize, new_item_size: usize) -> bool {
+    let current_mem_usage: usize = cache.values().map(|item| item.size).sum();
+
+    if current_mem_usage + new_item_size <= mem_limit {
+        return true;
+    }
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs();
+
+    cache.retain(|_, item| item.expiration == 0 || item.expiration > now);
+
+    let updated_mem_usage: usize = cache.values().map(|item| item.size).sum();
+    updated_mem_usage + new_item_size <= mem_limit
 }
