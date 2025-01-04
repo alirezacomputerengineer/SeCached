@@ -13,12 +13,12 @@ use handler::process_request;
 pub struct SeCached {
     listener: TcpListener,
     port: u32,
-    mem: u32,
+    mem: usize,
     connections: u32,
     listen: String,
 }
 impl SeCached {
-    pub fn new(port: u32, mem: u32, connections: u32, listen : String) -> SeCached {
+    pub fn new(port: u32, mem: usize, connections: u32, listen : String) -> SeCached {
         let address = format!("127.0.0.1:{}", port);
         let listener = TcpListener::bind(address).unwrap();
         SeCached {
@@ -72,9 +72,10 @@ impl SeCached {
             let cache = Arc::clone(&cache);
             let bus = Arc::clone(&bus);
             let active_connections = Arc::clone(&active_connections);
+            let mem = self.mem;
     
             thread::spawn(move || {
-                let result = process_request(stream, cache, bus);
+                let result = process_request(stream, cache, bus, mem);
                 active_connections.fetch_sub(1, Ordering::SeqCst); // Decrement active connection count
                 result
             });
