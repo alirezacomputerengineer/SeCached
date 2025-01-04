@@ -53,4 +53,3 @@ pub fn parse_req(s: &String) -> Request {
     };
     return req
 }
-
