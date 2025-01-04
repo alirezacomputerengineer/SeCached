@@ -16,14 +16,10 @@ pub fn process_request(
     mut stream: TcpStream,
     cache: Arc<RwLock<HashMap<String, CacheItem>>>,
     bus: Arc<RwLock<HashMap<String, Vec<TcpStream>>>>,
-    timeout: Option<Duration>,
 ) {
     loop {
         let cache = cache.clone();
         let bus = bus.clone();
-        if let Some(timeout) = timeout {
-            stream.set_read_timeout(Some(timeout)).unwrap();
-        }
 
         let mut buf_reader = BufReader::new(&mut stream);
         let mut first_line = String::new();
