@@ -68,7 +68,7 @@ get mykey
 ### Runtime Options Implementation
 | **Option**         | **Description**                              | **Example**                  | **Status** |
 |--------------------|----------------------------------------------|------------------------------|------------|
-| `-m <size>`       | Maximum memory usage (MB).                  | `-m 64`                     |      ✔     |
+| `-m <size>`       | Maximum memory usage (Byte).                  | `-m 67108864`             |      ✔     |
 | `-p <port>`       | Port number.                                | `-p 11211`                  |      ✔     |
 | `-l <ip>`         | Listen on specific IP address.              | `-l 127.0.0.1`              |      ✔     |
 | `-c <connections>`| Max simultaneous connections.               | `-c 1024`                   |      ✔     |
